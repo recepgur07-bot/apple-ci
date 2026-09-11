@@ -164,6 +164,12 @@ jobs:
           fi
 
       - name: Swift paket bağımlılıklarını cache'le
+        # Yalnız GitHub'ın tek kullanımlık makinelerinde anlamlı. Self-hosted
+        # runner kendi DerivedData'sını zaten koşular arasında tutuyor; üstelik
+        # orada bu yol geliştiricinin TÜM projelerini kapsıyor (ölçüldü: 468 MB,
+        # hiçbiri o an derlenen projeye ait değil) ve alakasız projelerin
+        # paketlerini depo önbelleğine yüklüyordu.
+        if: ${{ !contains(inputs.runs-on, 'self-hosted') }}
         uses: actions/cache@v6
         with:
           path: ~/Library/Developer/Xcode/DerivedData/**/SourcePackages

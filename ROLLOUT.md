@@ -5,7 +5,7 @@ verilecek parametreleri taşır.
 
 | Repo | Scheme | Proje | Hedef | XcodeGen | Test | Durum |
 |---|---|---|---|---|---|---|
-| FrameMate | FrameMate | VideoRecorder.xcodeproj | macOS | evet | 727 | **bağlandı (pilot)** |
+| FrameMate | FrameMate | VideoRecorder.xcodeproj | macOS | evet | 727 | **bağlandı (pilot), self-hosted** |
 | folio | Folio | Folio.xcodeproj | iOS Sim | evet | 67 dosya | bekliyor |
 | memora-app | Memora | Memora.xcodeproj | iOS Sim | evet | 532 dosya | bekliyor |
 | DeepFind | DeepFind | DeepFind.xcodeproj | macOS | evet | 139 dosya | bekliyor |
