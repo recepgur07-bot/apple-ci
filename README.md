@@ -64,7 +64,13 @@ kaynaktır. Sık kullanılanlar:
 
 ## Yanlış alarm çıkarsa (gitleaks)
 
-Kuralı veya dosyayı komple kapatma. Projeye dar kapsamlı bir
-`.gitleaks.toml` ekle: `targetRules` + `paths` + `regexes` ile yalnız o
-kalıbı serbest bırak, sonra aynı dosyaya sahte bir sır koyup hâlâ
-yakalandığını doğrula. Örnek: FrameMate deposundaki `.gitleaks.toml`.
+**`.gitleaksignore` kullanma.** Oradaki fingerprint'ler commit sha'sına
+bağlıdır: dosya bir daha düzenlendiği anda fingerprint değişir ve istisna
+sessizce geçersiz olur. FrameMate'te tam olarak bu oldu — `.gitleaksignore`
+vardı, dosya sonradan düzenlendi, CI altı koşu boyunca kırmızı kaldı ve
+kimse sebebini aramadı.
+
+Bunun yerine projeye dar kapsamlı bir `.gitleaks.toml` ekle: `targetRules` +
+`paths` + `regexes` ile yalnız o kalıbı serbest bırak. Sonra **aynı dosyaya
+sahte bir sır koyup hâlâ yakalandığını doğrula** — istisnanın dar olduğunun
+tek kanıtı budur. Örnek: FrameMate deposundaki `.gitleaks.toml`.
