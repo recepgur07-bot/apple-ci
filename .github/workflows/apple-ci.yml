@@ -61,6 +61,13 @@ on:
         required: false
         type: string
         default: ""
+      test-timeout-seconds:
+        description: >-
+          Tek bir testin en fazla ne kadar surebilecegi. Suresi asan test,
+          kosuyu sonsuza kadar bekletmek yerine adiyla raporlanir. 0 = kapali.
+        required: false
+        type: number
+        default: 120
       swiftlint-strict:
         description: "SwiftLint'i --strict ile koştur (uyarılar da hata sayılır)"
         required: false
@@ -199,6 +206,14 @@ jobs:
           args=(-scheme "$SCHEME" -destination "$DESTINATION"
                 -resultBundlePath TestResults.xcresult
                 CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO)
+          # Donan bir test, zaman asimi olmadan kosuyu timeout'a kadar
+          # bekletir ve hangi testin donduguna dair hicbir sey soylemez.
+          # DeepFind'da bu 33 dakika surdu ve testin adini ancak bu bayrak
+          # acikken bulabildik. Suresi asan test artik adiyla raporlanir.
+          if [ "${{ inputs.test-timeout-seconds }}" != "0" ]; then
+            args+=(-test-timeouts-enabled YES
+                   -default-test-execution-time-allowance ${{ inputs.test-timeout-seconds }})
+          fi
           if [ -n "$WORKSPACE" ]; then
             args=(-workspace "$WORKSPACE" "${args[@]}")
           elif [ -n "$PROJECT" ]; then
