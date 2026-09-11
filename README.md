@@ -40,6 +40,39 @@ kısıyor:
 
 Kota yine de yetmezse bir sonraki adım kendi Mac'inde self-hosted runner.
 
+## Self-hosted runner (kendi Mac'inde)
+
+macOS job'unu kendi makinende koşturmak icin caller'a `runs-on: self-hosted`
+ekle. Kurulum: GitHub'in resmi runner'i, depo ayarlarindan alinan kayit
+anahtariyla, `~/actions-runner/<proje>` altinda; `./svc.sh install && start`
+ile servis olur.
+
+Olculen fark (FrameMate): GitHub'in Mac'inde 201 sn, kendi Mac'inde 82 sn.
+macOS faturalandirma kalemi tamamen kayboluyor.
+
+**Kisit:** kisisel hesapta runner yalniz DEPO seviyesinde tanimlanabilir.
+Tek runner'i birden cok repoda paylasmak icin ucretsiz bir organizasyon
+kurup repolari oraya tasimak gerekir.
+
+**Guvenlik:** yalniz private depolarda kullan. Public bir depoda herkes
+fork acip pull request ile senin makinende kod calistirabilir.
+
+### Self-hosted'a gecerken dikkat
+
+Bu ikisi yalniz gercek bir kosuda ortaya cikti:
+
+- **SPM onbellegi kapatilmali.** `DerivedData/**/SourcePackages` yolu
+  GitHub'in tek kullanimlik makinesinde yalniz o projeyi kapsar; kendi
+  Mac'inde daha once derledigin HER projeyi kapsar (olculdu: 468 MB, hicbiri
+  test edilen projeye ait degil). Ortak workflow bunu `runs-on` self-hosted
+  iceriyorsa otomatik atliyor.
+- **`.env` icindeki LANG'e bak.** `config.sh` makinenin dilini yaziyor
+  (`tr_TR.UTF-8`). Turkce locale'in noktasiz-i davranisi derlemede tuhaf
+  hatalara yol acabiliyor; `en_US.UTF-8` birak ve tek satir oldugundan emin ol.
+- **Izin pencereleri.** Servis arka planda kostugu icin macOS'un izin
+  penceresini kimse tiklayamaz ve test sonsuza kadar bekler. Bir test suiti
+  aciklanamayan sekilde donuyorsa once bunu supheli gor.
+
 ## Yeni projeye ekleme
 
 ```bash
