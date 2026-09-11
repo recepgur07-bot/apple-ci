@@ -76,6 +76,13 @@ on:
         required: false
         type: string
         default: ""
+      notify:
+        description: >-
+          true ise koşu başarısız olduğunda ULAK ile telefona bildirim gönderir.
+          Bildirim komutu yerel makinede çalıştığı için self-hosted runner ister.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -235,3 +242,33 @@ jobs:
           path: TestResults.xcresult
           retention-days: 7
           if-no-files-found: ignore
+
+  # --- Bildirim: yalnız bir şey bozulduğunda ------------------------------------
+  bildirim:
+    name: Bildirim
+    needs: [checks, build-test]
+    # always(): onceki job'lar dustugunde de calissin. Yalnizca en az biri
+    # basarisizsa bildirim gider - her yesil kosuda telefon calmasin.
+    if: >-
+      ${{ always() && inputs.notify
+          && (needs.checks.result != 'success' || needs.build-test.result != 'success') }}
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+      - name: ULAK bildirimi
+        # Bildirim gonderememek kosuyu bozmamali; bu adim asla hata dondurmez.
+        continue-on-error: true
+        run: |
+          ULAK="$HOME/.ulak/bin/ulak-notify"
+          if [ ! -x "$ULAK" ]; then
+            echo "ULAK bulunamadi, bildirim atlandi: $ULAK"
+            exit 0
+          fi
+          nerede=""
+          [ "${{ needs.checks.result }}" != "success" ] && nerede="hizli kontroller"
+          if [ "${{ needs.build-test.result }}" != "success" ]; then
+            [ -n "$nerede" ] && nerede="$nerede ve derleme/test" || nerede="derleme/test"
+          fi
+          "$ULAK" \
+            --source "CI · ${{ github.event.repository.name }}" \
+            --state "basarisiz" \
+            --message "${{ github.ref_name }} dalinda $nerede gecmedi. Ayrinti: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
