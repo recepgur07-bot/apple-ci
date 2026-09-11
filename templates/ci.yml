@@ -1,0 +1,30 @@
+# Bu dosya projeye kopyalanır ve yalnız `with:` bloğu projeye göre düzenlenir.
+# Mantık burada değil, recepgur07-bot/apple-ci içindedir; düzeltme oraya
+# yapılınca tüm projelere yayılır.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "fastlane/metadata/**"
+      - "fastlane/screenshots/**"
+      - "**/*.md"
+
+concurrency:
+  # Aynı dalın eski koşusunu iptal eder. macOS dakikası 10x faturalandığı
+  # için üst üste push'larda en çok tasarruf sağlayan tek ayar budur.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: recepgur07-bot/apple-ci/.github/workflows/apple-ci.yml@main
+    with:
+      scheme: DEGISTIR
+      project: DEGISTIR.xcodeproj
+      destination: "platform=iOS Simulator,name=iPhone 17"
+      xcodegen: true

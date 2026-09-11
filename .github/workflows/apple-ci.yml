@@ -1,0 +1,231 @@
+# Apple projeleri için ortak CI. Tek doğruluk kaynağı burasıdır; projeler bunu
+# workflow_call ile çağırır, kendi kopyalarını tutmaz.
+#
+# Tasarım kararları:
+# - Ucuz kontroller (sır taraması, depo hijyeni, projeye özel script'ler)
+#   ubuntu'da koşar. Private repoda macOS dakikası 10x çarpanla faturalanır,
+#   ubuntu 1x'tir; bu iş macOS'ta koşmak için hiçbir sebep yok.
+# - Sır taraması ile derleme AYRI job'lardır ve birbirine bağlı değildir.
+#   Tek job olduğunda gitleaks'in yanlış alarmı testlere hiç sıra gelmeden
+#   her şeyi kırmızıya boyuyordu (FrameMate'te altı koşu boyunca olan buydu).
+# - macOS job'unda adımlar `!cancelled()` ile koşar: bir format nit'i test
+#   sonucunu gizlemez, hepsi tek koşuda raporlanır.
+# - İmzalama, yükleme, release yok. Bu workflow salt-okunur bir kalite kapısıdır.
+
+name: Apple CI
+
+on:
+  workflow_call:
+    inputs:
+      scheme:
+        description: "xcodebuild scheme adı"
+        required: true
+        type: string
+      project:
+        description: "xcodeproj yolu (workspace kullanılıyorsa boş bırak)"
+        required: false
+        type: string
+        default: ""
+      workspace:
+        description: "xcworkspace yolu (project yerine)"
+        required: false
+        type: string
+        default: ""
+      destination:
+        description: "xcodebuild -destination değeri"
+        required: false
+        type: string
+        default: "platform=iOS Simulator,name=iPhone 17"
+      runs-on:
+        description: "macOS runner imajı"
+        required: false
+        type: string
+        default: "macos-15"
+      xcode-version:
+        description: "Sabitlenecek Xcode sürümü. Boş bırakılırsa imajın varsayılanı kullanılır."
+        required: false
+        type: string
+        default: ""
+      run-tests:
+        description: "false ise yalnız derler, test koşmaz (test target'ı olmayan repolar için)"
+        required: false
+        type: boolean
+        default: true
+      xcodegen:
+        description: "true ise build öncesi `xcodegen generate` çalıştırılır"
+        required: false
+        type: boolean
+        default: false
+      swiftformat-paths:
+        description: "SwiftFormat --lint hedefleri. Boşsa .swiftformat varsa '.' kullanılır."
+        required: false
+        type: string
+        default: ""
+      swiftlint-strict:
+        description: "SwiftLint'i --strict ile koştur (uyarılar da hata sayılır)"
+        required: false
+        type: boolean
+        default: false
+      extra-checks:
+        description: "ubuntu hızlı kapıda koşacak ek komut (ör. python3 scripts/check-metadata-limits.py)"
+        required: false
+        type: string
+        default: ""
+      extra-macos-checks:
+        description: "macOS job'unda testlerden sonra koşacak ek komut"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  # --- Hızlı kapı: ubuntu, 1x fiyat, ~1 dakika --------------------------------
+  checks:
+    name: Hızlı kontroller
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: gitleaks kur
+        run: |
+          VERSION=8.30.1
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: Sır taraması
+        # --redact=100: bulgu çıkarsa bile sırrın kendisi log'a yazılmaz.
+        # Depoda .gitleaks.toml varsa (dar kapsamlı yanlış-alarm istisnaları
+        # için) o kullanılır.
+        run: |
+          if [ -f .gitleaks.toml ]; then
+            gitleaks git . --redact=100 --no-banner --config .gitleaks.toml
+          else
+            gitleaks git . --redact=100 --no-banner
+          fi
+
+      - name: Depo hijyeni
+        # Sertifika, private key ve imzalama profili git'e hiç girmemeli.
+        # Bunlar .gitignore'da olmalı; takip ediliyorlarsa build kırılmalı.
+        run: |
+          BAD=$(git ls-files | grep -iE '\.(p12|cer|pem|mobileprovision|provisionprofile|keystore|jks)$' || true)
+          if [ -n "$BAD" ]; then
+            echo "::error::Kimlik bilgisi dosyaları depoda takip ediliyor:"
+            echo "$BAD"
+            exit 1
+          fi
+          echo "Takip edilen kimlik bilgisi dosyası yok."
+
+      - name: Projeye özel kontroller
+        if: ${{ inputs.extra-checks != '' }}
+        run: ${{ inputs.extra-checks }}
+
+  # --- Derleme ve test: macOS, 10x fiyat, sıkı tetikleyiciyle -----------------
+  build-test:
+    name: Derleme ve test
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Xcode sürümünü sabitle
+        if: ${{ inputs.xcode-version != '' }}
+        # Sürüm sabitlenmezse GitHub runner imajını güncellediği gün
+        # tüm projeler aynı sabah sebepsiz kırılır.
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_${{ inputs.xcode-version }}.app/Contents/Developer"
+          xcodebuild -version
+
+      - name: Araçları kur
+        # brew install her koşuda dakikalar yakıyordu. Runner imajında zaten
+        # kurulu olanı yeniden kurmuyoruz; yalnız eksik olanı çekiyoruz.
+        run: |
+          need=""
+          command -v xcbeautify >/dev/null || need="$need xcbeautify"
+          if [ "${{ inputs.xcodegen }}" = "true" ]; then
+            command -v xcodegen >/dev/null || need="$need xcodegen"
+          fi
+          if [ -f .swiftformat ]; then
+            command -v swiftformat >/dev/null || need="$need swiftformat"
+          fi
+          if [ -f .swiftlint.yml ]; then
+            command -v swiftlint >/dev/null || need="$need swiftlint"
+          fi
+          if [ -n "$need" ]; then
+            echo "Kurulacak: $need"
+            brew install --quiet $need
+          else
+            echo "Tüm araçlar imajda mevcut."
+          fi
+
+      - name: Swift paket bağımlılıklarını cache'le
+        uses: actions/cache@v6
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: spm-${{ inputs.scheme }}-${{ hashFiles('**/Package.resolved', '**/project.yml') }}
+          restore-keys: spm-${{ inputs.scheme }}-
+
+      - name: Xcode projesini üret
+        if: ${{ inputs.xcodegen }}
+        run: xcodegen generate
+
+      - name: Derle ve test et
+        if: ${{ !cancelled() }}
+        env:
+          SCHEME: ${{ inputs.scheme }}
+          DESTINATION: ${{ inputs.destination }}
+          PROJECT: ${{ inputs.project }}
+          WORKSPACE: ${{ inputs.workspace }}
+        run: |
+          set -o pipefail
+          args=(-scheme "$SCHEME" -destination "$DESTINATION"
+                -resultBundlePath TestResults.xcresult
+                CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO)
+          if [ -n "$WORKSPACE" ]; then
+            args=(-workspace "$WORKSPACE" "${args[@]}")
+          elif [ -n "$PROJECT" ]; then
+            args=(-project "$PROJECT" "${args[@]}")
+          fi
+          action=test
+          [ "${{ inputs.run-tests }}" = "true" ] || action=build
+          xcodebuild "$action" "${args[@]}" | xcbeautify
+
+      - name: Format denetimi (SwiftFormat)
+        # `!cancelled()`: test düştüyse bile koşar. Tek koşuda her iki
+        # sonucu da görmek, iki koşu harcamaktan ucuz.
+        if: ${{ !cancelled() }}
+        run: |
+          [ -f .swiftformat ] || { echo "SwiftFormat yapılandırması yok, atlanıyor."; exit 0; }
+          paths="${{ inputs.swiftformat-paths }}"
+          [ -n "$paths" ] || paths="."
+          swiftformat --lint $paths
+
+      - name: Lint (SwiftLint)
+        if: ${{ !cancelled() }}
+        run: |
+          [ -f .swiftlint.yml ] || { echo "SwiftLint yapılandırması yok, atlanıyor."; exit 0; }
+          if [ "${{ inputs.swiftlint-strict }}" = "true" ]; then
+            swiftlint lint --strict --quiet
+          else
+            swiftlint lint --quiet
+          fi
+
+      - name: Projeye özel macOS kontrolleri
+        if: ${{ !cancelled() && inputs.extra-macos-checks != '' }}
+        run: ${{ inputs.extra-macos-checks }}
+
+      - name: Test sonuçlarını yükle
+        # Uzaktan teşhis için şart: .xcresult olmadan hangi testin neden
+        # düştüğünü log satırlarından çıkarmaya çalışmak gerekiyor.
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: xcresult-${{ inputs.scheme }}
+          path: TestResults.xcresult
+          retention-days: 7
+          if-no-files-found: ignore

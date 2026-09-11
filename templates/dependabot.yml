@@ -1,0 +1,13 @@
+# .github/dependabot.yml olarak kopyalanır.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+  - package-ecosystem: swift
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
