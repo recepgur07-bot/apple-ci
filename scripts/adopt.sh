@@ -52,6 +52,7 @@ fi
   echo "name: CI"
   echo
   echo "on:"
+  echo "  workflow_dispatch:"
   echo "  pull_request:"
   echo "  push:"
   echo "    branches: [main]"

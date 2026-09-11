@@ -5,6 +5,8 @@
 name: CI
 
 on:
+  # Elle tetikleme: Actions sekmesinden "Run workflow" ile kosu baslatir.
+  workflow_dispatch:
   pull_request:
   push:
     branches: [main]
