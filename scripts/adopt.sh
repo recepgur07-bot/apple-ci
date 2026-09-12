@@ -11,11 +11,13 @@ usage() {
 Kullanım:
   adopt.sh <proje-yolu> --scheme <ad> [--project X.xcodeproj | --workspace X.xcworkspace]
                         [--destination '...'] [--no-xcodegen] [--no-tests]
-                        [--extra-checks 'komut'] [--self-hosted]
+                        [--extra-checks 'komut'] [--self-hosted] [--notify]
                         [--runs-on <ad>] [--checks-runs-on <ad>] [--force]
 
 --self-hosted: hem derleme/test hem hızlı kontroller job'ını self-hosted'a
 alır (--runs-on self-hosted --checks-runs-on self-hosted ile aynı).
+--notify: koşu başarısız olunca ULAK ile telefona bildirim gönderir.
+Yalnız self-hosted'da anlamlı (bildirim komutu yerel Mac'te çalışır).
 USAGE
   exit 2
 }
@@ -25,7 +27,7 @@ TARGET=$1; shift
 [ -d "$TARGET" ] || { echo "Proje klasörü yok: $TARGET" >&2; exit 2; }
 
 scheme=""; project=""; workspace=""; destination="platform=iOS Simulator,name=iPhone 17"
-xcodegen=true; tests=true; extra=""; force=false; runson=""; checksrunson=""
+xcodegen=true; tests=true; extra=""; force=false; runson=""; checksrunson=""; notify=false
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -37,6 +39,7 @@ while [ "$#" -gt 0 ]; do
     --runs-on) runson=${2:-}; shift 2 ;;
     --checks-runs-on) checksrunson=${2:-}; shift 2 ;;
     --self-hosted) runson="self-hosted"; checksrunson="self-hosted"; shift ;;
+    --notify) notify=true; shift ;;
     --no-xcodegen) xcodegen=false; shift ;;
     --no-tests) tests=false; shift ;;
     --force) force=true; shift ;;
@@ -85,6 +88,7 @@ fi
   [ "$tests" = true ] || echo "      run-tests: false"
   [ -n "$runson" ] && echo "      runs-on: $runson"
   [ -n "$checksrunson" ] && echo "      checks-runs-on: $checksrunson"
+  [ "$notify" = true ] && echo "      notify: true"
   [ -n "$extra" ] && echo "      extra-checks: $extra"
 } > "$CI"
 
