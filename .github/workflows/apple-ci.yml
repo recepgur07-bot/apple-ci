@@ -41,6 +41,15 @@ on:
         required: false
         type: string
         default: "macos-15"
+      checks-runs-on:
+        description: >-
+          Hızlı kontrollerin koşacağı runner. Varsayılan ubuntu 1x fiyatlıdır ve
+          Mac kapalıyken de koşar. GitHub'ın barındırdığı runner'a hiç
+          erişilemediği (kota, harcama limiti) projelerde self-hosted'a
+          alınabilir: kontrollerin kendisi platformdan bağımsızdır.
+        required: false
+        type: string
+        default: "ubuntu-latest"
       xcode-version:
         description: "Sabitlenecek Xcode sürümü. Boş bırakılırsa imajın varsayılanı kullanılır."
         required: false
@@ -95,10 +104,10 @@ permissions:
   contents: read
 
 jobs:
-  # --- Hızlı kapı: ubuntu, 1x fiyat, ~1 dakika --------------------------------
+  # --- Hızlı kapı: varsayılan ubuntu, 1x fiyat, ~1 dakika ---------------------
   checks:
     name: Hızlı kontroller
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.checks-runs-on }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
@@ -106,11 +115,26 @@ jobs:
           fetch-depth: 0
 
       - name: gitleaks kur
+        # Bu job artık self-hosted bir Mac'te de koşabiliyor, yani ne işletim
+        # sistemi ne de /usr/local/bin'e yazma hakkı verili sayılabilir:
+        # ikiliyi koşuya ait geçici dizine açıp PATH'e ekliyoruz. Böylece
+        # geliştiricinin makinesinde kalıcı bir iz de bırakmıyoruz.
         run: |
+          set -euo pipefail
           VERSION=8.30.1
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
-            | tar -xz -C /usr/local/bin gitleaks
-          gitleaks version
+          case "$(uname -s)" in
+            Darwin) os=darwin ;;
+            *)      os=linux ;;
+          esac
+          case "$(uname -m)" in
+            arm64|aarch64) arch=arm64 ;;
+            *)             arch=x64 ;;
+          esac
+          mkdir -p "${RUNNER_TEMP}/bin"
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_${os}_${arch}.tar.gz" \
+            | tar -xz -C "${RUNNER_TEMP}/bin" gitleaks
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+          "${RUNNER_TEMP}/bin/gitleaks" version
 
       - name: Sır taraması
         # --redact=100: bulgu çıkarsa bile sırrın kendisi log'a yazılmaz.
