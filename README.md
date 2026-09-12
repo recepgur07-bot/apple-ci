@@ -14,8 +14,14 @@ sürtünmesiz çağırabilmesidir.
 
 | Job | Runner | Fiyat | İçerik |
 |---|---|---|---|
-| Hızlı kontroller | `ubuntu-latest` | 1x | gitleaks sır taraması, depo hijyeni (sertifika/anahtar takip ediliyor mu), projeye özel script'ler |
+| Hızlı kontroller | `ubuntu-latest` (`checks-runs-on` ile değiştirilebilir) | 1x | gitleaks sır taraması, depo hijyeni (sertifika/anahtar takip ediliyor mu), projeye özel script'ler |
 | Derleme ve test | `macos-15` | 10x | XcodeGen, `xcodebuild test`, SwiftFormat, SwiftLint, hata halinde `.xcresult` artifact |
+
+Hızlı kontroller platformdan bağımsızdır; `checks-runs-on` ile self-hosted bir
+Mac'e alınabilirler. Varsayılan ubuntu olmaya devam ediyor çünkü 1x fiyatlı ve
+Mac kapalıyken de koşuyor — ama GitHub'ın barındırdığı runner'a hiç
+erişilemeyen bir projede (kota dolmuş, harcama limiti sıfır) kontrollerin hiç
+koşmaması yerine Mac'te koşması yeğdir.
 
 Job'lar birbirine bağlı **değildir**. Sır taramasının yanlış alarmı
 testlerin koşmasını engellemez — bu, sistemin kurulma sebebiydi.
