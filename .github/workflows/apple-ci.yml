@@ -87,6 +87,15 @@ on:
         required: false
         type: string
         default: ""
+      pre-build:
+        description: >-
+          macOS job'unda checkout'tan hemen sonra, xcodegen ve derlemeden önce
+          koşacak komut. Depoya girmeyen ama proje dosyasının başvurduğu yerel
+          dosyalar içindir (ör. imza xcconfig'i): taze bir kopyada var olmayan
+          böyle bir dosya, derlemeyi hiçbir testi koşturmadan düşürür.
+        required: false
+        type: string
+        default: ""
       extra-macos-checks:
         description: "macOS job'unda testlerden sonra koşacak ek komut"
         required: false
@@ -213,6 +222,10 @@ jobs:
           path: ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
           key: spm-${{ inputs.scheme }}-${{ hashFiles('**/Package.resolved', '**/project.yml') }}
           restore-keys: spm-${{ inputs.scheme }}-
+
+      - name: Derleme öncesi hazırlık
+        if: ${{ inputs.pre-build != '' }}
+        run: ${{ inputs.pre-build }}
 
       - name: Xcode projesini üret
         if: ${{ inputs.xcodegen }}

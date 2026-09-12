@@ -23,6 +23,11 @@ Mac kapalıyken de koşuyor — ama GitHub'ın barındırdığı runner'a hiç
 erişilemeyen bir projede (kota dolmuş, harcama limiti sıfır) kontrollerin hiç
 koşmaması yerine Mac'te koşması yeğdir.
 
+`pre-build` girdisi, proje dosyasının başvurduğu ama depoya girmeyen yerel
+dosyalar içindir (imza xcconfig'i gibi). Taze bir kopyada böyle bir dosyanın
+yokluğu derlemeyi tek bir testi bile koşturmadan düşürür; komut checkout'tan
+sonra, xcodegen'den önce koşar.
+
 Job'lar birbirine bağlı **değildir**. Sır taramasının yanlış alarmı
 testlerin koşmasını engellemez — bu, sistemin kurulma sebebiydi.
 
