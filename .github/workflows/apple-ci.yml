@@ -223,6 +223,18 @@ jobs:
           key: spm-${{ inputs.scheme }}-${{ hashFiles('**/Package.resolved', '**/project.yml') }}
           restore-keys: spm-${{ inputs.scheme }}-
 
+      - name: Eski xcodebuild artıklarını temizle
+        # Self-hosted runner'da çalışma dizini koşular arasında paylaşılıyor.
+        # Bir koşu iptal edildiğinde GitHub Actions arkadaki xcodebuild
+        # sürecini her zaman öldürmez; o süreç TestResults.xcresult'a yazmaya
+        # devam ederken bir sonraki koşu "Existing file at -resultBundlePath"
+        # hatasıyla düşer. Yeni build'den önce hem yetim süreci hem artığı
+        # temizliyoruz.
+        if: ${{ contains(inputs.runs-on, 'self-hosted') }}
+        run: |
+          pkill -f xcodebuild 2>/dev/null || true
+          rm -rf TestResults.xcresult
+
       - name: Derleme öncesi hazırlık
         if: ${{ inputs.pre-build != '' }}
         run: ${{ inputs.pre-build }}
