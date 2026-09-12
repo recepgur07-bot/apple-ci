@@ -101,6 +101,29 @@ on:
         required: false
         type: string
         default: ""
+      code-signing:
+        description: >-
+          Simülatör derlemesinde imzalamaya izin verilsin mi.
+
+          Varsayılan false, `CODE_SIGNING_ALLOWED=NO` demektir ve GitHub'ın
+          barındırdığı runner'lar için DOĞRUDUR: orada imzalama kurulu değildir.
+          Ama imzalamanın kurulu olduğu self-hosted bir Mac'te bu ayar SESSİZ
+          bir tuzaktır: imzalama kapalıyken hedefin `.entitlements` içeriği
+          binary'ye hiç gömülmez. Simülatörde entitlement'lar `__TEXT,__entitlements`
+          bölümünde taşınır ve `CODE_SIGNING_ALLOWED=NO` ile o bölüm hiç
+          üretilmez (2026-09-12'de Folio'da ölçüldü: normal derlemede bölüm var
+          ve iCloud konteynerlerini taşıyor, bu ayarla bölüm yok).
+
+          Sonuç: CI, üretimde var olmayan entitlement'sız bir binary'yi test
+          eder. CloudKit'e dokunan her yol süreci öldürür ve bu testlerde
+          "application is not running" olarak görünür — günlerce kovalanan
+          ama gerçek sebebi çok uzakta olan bir belirti.
+
+          Entitlement kullanan (iCloud, CloudKit, HealthKit, App Groups…)
+          projeler self-hosted Mac'te bunu true yapmalıdır.
+        required: false
+        type: boolean
+        default: false
       notify:
         description: >-
           true ise koşu başarısız olduğunda ULAK ile telefona bildirim gönderir.
@@ -253,8 +276,12 @@ jobs:
         run: |
           set -o pipefail
           args=(-scheme "$SCHEME" -destination "$DESTINATION"
-                -resultBundlePath TestResults.xcresult
-                CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO)
+                -resultBundlePath TestResults.xcresult)
+          # Bkz. `code-signing` girdisinin açıklaması: imzalamayı kapatmak
+          # entitlement'ları binary'den tamamen düşürür.
+          if [ "${{ inputs.code-signing }}" != "true" ]; then
+            args+=(CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO)
+          fi
           # Donan bir test, zaman asimi olmadan kosuyu timeout'a kadar
           # bekletir ve hangi testin donduguna dair hicbir sey soylemez.
           # DeepFind'da bu 33 dakika surdu ve testin adini ancak bu bayrak
