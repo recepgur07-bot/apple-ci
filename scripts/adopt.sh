@@ -68,9 +68,10 @@ fi
   echo "    branches: [main]"
   echo "    paths-ignore:"
   echo '      - "docs/**"'
-  echo '      - "fastlane/metadata/**"'
   echo '      - "fastlane/screenshots/**"'
   echo '      - "**/*.md"'
+  # fastlane/metadata BİLEREK burada yok (K9): metadata denetimi tam o
+  # dosyalara bakar, filtrelenirse en gerekli anda susar.
   echo
   echo "concurrency:"
   echo '  group: ci-${{ github.ref }}'
